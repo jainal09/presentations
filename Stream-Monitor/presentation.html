@@ -1,0 +1,1651 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Circuit Breaker Lock Mechanism</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1f35 0%, #2d3561 100%);
+            color: #ffffff;
+            height: 100vh;
+            overflow: hidden;
+            /* Keep this for the overall layout */
+        }
+
+        .presentation-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: 300px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            overflow-y: auto;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar h3 {
+            color: #64b5f6;
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+
+        .slide-nav {
+            list-style: none;
+        }
+
+        .slide-nav li {
+            margin-bottom: 8px;
+            padding: 12px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            color: #b0bec5;
+        }
+
+        .slide-nav li:hover {
+            background: rgba(100, 181, 246, 0.1);
+            color: #64b5f6;
+        }
+
+        .slide-nav li.active {
+            background: #64b5f6;
+            color: #1a1f35;
+            font-weight: 500;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 40px 60px 100px 60px;
+            /* Added bottom padding for navigation */
+            position: relative;
+            transition: padding-left 0.3s ease;
+            overflow-y: auto;
+            /* Allow vertical scrolling */
+            max-height: 100vh;
+            /* Constrain height to viewport */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            /* Center content vertically */
+        }
+
+        .main-content.top-align {
+            justify-content: flex-start;
+            /* override the default centre alignment */
+        }
+
+        .slide {
+            display: none;
+            animation: fadeIn 0.5s ease-in-out;
+            padding-bottom: 20px;
+            /* Extra space at bottom */
+            flex-shrink: 0;
+            /* Prevent shrinking when content is large */
+        }
+
+        .slide.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .slide h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            background: linear-gradient(45deg, #64b5f6, #42a5f5);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .slide h2 {
+            font-size: 36px;
+            margin-bottom: 30px;
+            color: #e3f2fd;
+        }
+
+        .slide h3 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #64b5f6;
+        }
+
+        .slide p {
+            font-size: 18px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            color: #b0bec5;
+        }
+
+        .subtitle {
+            font-size: 20px;
+            color: #90a4ae;
+            margin-bottom: 40px;
+            font-weight: 300;
+        }
+
+        .components-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .component-section {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(100, 181, 246, 0.3);
+            border-radius: 12px;
+            padding: 25px;
+        }
+
+        .component-section h4 {
+            color: #64b5f6;
+            font-size: 18px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+
+        .component-item {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 10px;
+            border-left: 3px solid #64b5f6;
+        }
+
+        .component-item h5 {
+            color: #e3f2fd;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+
+        .component-item p {
+            color: #90a4ae;
+            font-size: 12px;
+            margin: 0;
+        }
+
+        .resources-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .resource-card {
+            background: rgba(255, 193, 7, 0.1);
+            border: 1px solid rgba(255, 193, 7, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .resource-card h5 {
+            color: #ffc107;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        .logo {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto;
+            background: radial-gradient(circle, #64b5f6 0%, #1976d2 70%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            margin-bottom: 30px;
+            animation: logoRotate 3s linear infinite, logoPulse 1.2s ease-in-out infinite alternate;
+            box-shadow: 0 0 30px rgba(100, 181, 246, 0.3);
+        }
+
+        .logo::before {
+            content: '';
+            width: 80px;
+            height: 80px;
+            background: radial-gradient(circle, #42a5f5 0%, #1565c0 70%);
+            border-radius: 50%;
+            position: absolute;
+            animation: logoRotateReverse 2s linear infinite, middleRingPulse 1s ease-in-out infinite alternate;
+            box-shadow: 0 0 20px rgba(66, 165, 245, 0.4);
+        }
+
+        .logo::after {
+            content: '';
+            width: 40px;
+            height: 40px;
+            background: radial-gradient(circle, #1976d2 0%, #0d47a1 100%);
+            border-radius: 50%;
+            position: absolute;
+            z-index: 1;
+            animation: corePulse 0.8s ease-in-out infinite alternate;
+            box-shadow: 0 0 15px rgba(25, 118, 210, 0.6);
+        }
+
+        @keyframes logoRotate {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes logoRotateReverse {
+            from {
+                transform: rotate(360deg);
+            }
+
+            to {
+                transform: rotate(0deg);
+            }
+        }
+
+        @keyframes logoPulse {
+            from {
+                transform: scale(1);
+                box-shadow: 0 0 30px rgba(100, 181, 246, 0.3);
+            }
+
+            to {
+                transform: scale(1.15);
+                box-shadow: 0 0 50px rgba(100, 181, 246, 0.8);
+            }
+        }
+
+        @keyframes middleRingPulse {
+            from {
+                transform: scale(1);
+                box-shadow: 0 0 20px rgba(66, 165, 245, 0.4);
+            }
+
+            to {
+                transform: scale(1.2);
+                box-shadow: 0 0 35px rgba(66, 165, 245, 0.8);
+            }
+        }
+
+        @keyframes corePulse {
+            from {
+                transform: scale(1);
+                box-shadow: 0 0 15px rgba(25, 118, 210, 0.6);
+            }
+
+            to {
+                transform: scale(1.3);
+                box-shadow: 0 0 25px rgba(25, 118, 210, 1);
+            }
+        }
+
+        .navigation {
+            position: fixed;
+            /* Changed from absolute to fixed */
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            background: rgba(26, 31, 53, 0.9);
+            /* Added background for better visibility */
+            padding: 10px 20px;
+            border-radius: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            /* Added blur effect */
+            z-index: 1000;
+            /* Ensure it stays on top */
+        }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .nav-btn:hover {
+            background: rgba(100, 181, 246, 0.2);
+            border-color: #64b5f6;
+        }
+
+        .nav-btn:focus {
+            outline: none;
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .slide-counter {
+            color: #90a4ae;
+            font-size: 14px;
+        }
+
+        .feature-list {
+            list-style: none;
+            margin-top: 20px;
+        }
+
+        .feature-list li {
+            background: rgba(76, 175, 80, 0.1);
+            border-left: 3px solid #4caf50;
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            border-radius: 0 8px 8px 0;
+            color: #c8e6c9;
+        }
+
+        .code-block {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(100, 181, 246, 0.2);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            color: #f8f8f2;
+            overflow-x: auto;
+            line-height: 1.4;
+            white-space: pre-wrap;
+        }
+
+        .code-block .keyword {
+            color: #66d9ef;
+        }
+
+        .code-block .string {
+            color: #e6db74;
+        }
+
+        .code-block .comment {
+            color: #75715e;
+            font-style: italic;
+        }
+
+        .code-block .function {
+            color: #a6e22e;
+        }
+
+        .sidebar.collapsed {
+            width: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .sidebar.collapsed .slide-nav,
+        .sidebar.collapsed h3 {
+            display: none;
+        }
+
+        .sidebar.collapsed .slide-nav,
+        .sidebar.collapsed h3 {
+            display: none;
+        }
+
+        .toggle-sidebar {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(100, 181, 246, 0.2);
+            border: 1px solid rgba(100, 181, 246, 0.3);
+            color: #64b5f6;
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .toggle-sidebar:hover {
+            background: rgba(100, 181, 246, 0.3);
+            border-color: #64b5f6;
+        }
+
+        .toggle-sidebar:focus {
+            outline: none;
+        }
+
+        .sidebar-toggle-btn {
+            position: fixed;
+            top: 50%;
+            left: 275px;
+            transform: translateY(-50%);
+            background: rgba(100, 181, 246, 0.9);
+            border: 2px solid #64b5f6;
+            color: #1a1f35;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: left 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+            font-size: 18px;
+            font-weight: bold;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(100, 181, 246, 0.5);
+        }
+
+        .sidebar-toggle-btn:hover {
+            background: #64b5f6;
+            transform: translateY(-50%) scale(1.1);
+            box-shadow: 0 4px 15px rgba(100, 181, 246, 0.8);
+        }
+
+        .sidebar-toggle-btn:focus {
+            outline: none;
+        }
+
+        .main-content.fullscreen {
+            padding-left: 60px;
+        }
+
+        .highlight {
+            color: #64b5f6;
+            font-weight: 500;
+        }
+
+        .warning {
+            background: rgba(255, 152, 0, 0.1);
+            border-left: 3px solid #ff9800;
+            padding: 15px;
+            border-radius: 0 8px 8px 0;
+            margin: 20px 0;
+        }
+
+        .timeline-item {
+            background: rgba(76, 175, 80, 0.1);
+            border-left: 3px solid #4caf50;
+            padding: 8px 12px;
+            margin-bottom: 5px;
+            border-radius: 0 6px 6px 0;
+            font-size: 12px;
+            font-family: monospace;
+        }
+
+        .metric-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(100, 181, 246, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+
+        .metric-card h6 {
+            color: #64b5f6;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .alert-level-critical {
+            border-left-color: #f44336;
+            background: rgba(244, 67, 54, 0.1);
+        }
+
+        .alert-level-warning {
+            border-left-color: #ff9800;
+            background: rgba(255, 152, 0, 0.1);
+        }
+
+        .alert-level-info {
+            border-left-color: #2196f3;
+            background: rgba(33, 150, 243, 0.1);
+        }
+
+        /* Responsive adjustments */
+        @media (max-height: 800px) {
+            .slide h1 {
+                font-size: 36px;
+                margin-bottom: 15px;
+            }
+
+            .slide h2 {
+                font-size: 28px;
+                margin-bottom: 20px;
+            }
+
+            .main-content {
+                padding: 20px 40px 100px 40px;
+            }
+
+            .components-grid {
+                gap: 20px;
+            }
+        }
+
+        /* Smooth scrolling for the main content */
+        .main-content {
+            scroll-behavior: smooth;
+        }
+
+        /* Custom scrollbar styling */
+        .main-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .main-content::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+
+        .main-content::-webkit-scrollbar-thumb {
+            background: rgba(100, 181, 246, 0.3);
+            border-radius: 10px;
+            transition: background 0.3s ease;
+        }
+
+        .main-content::-webkit-scrollbar-thumb:hover {
+            background: rgba(100, 181, 246, 0.5);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="presentation-container">
+        <div class="sidebar" id="sidebar">
+            <h3>Slides</h3>
+            <ul class="slide-nav">
+                <li class="active" data-slide="0">1. Introduction</li>
+                <li data-slide="1">2. Architecture Overview</li>
+                <li data-slide="2">3. Lock Types & Components</li>
+                <li data-slide="3">4. Process Coordination</li>
+                <li data-slide="4">5. Lock Behavior</li>
+                <li data-slide="5">6. Error Handling & Recovery</li>
+                <li data-slide="6">7. Benefits & Conclusion</li>
+                <li data-slide="7">8. Failure Scenario Walkthrough</li>
+                <li data-slide="8">9. Configuration Tuning Guide</li>
+                <li data-slide="9">10. Troubleshooting Common Issues</li>
+                <li data-slide="10">11. Performance & Monitoring</li>
+            </ul>
+        </div>
+
+        <div class="main-content" id="mainContent">
+            <!-- Slide 1: Introduction -->
+            <div class="slide active">
+                <div style="text-align: center;">
+                    <h3>Introduction to</h3>
+                    <h1>Circuit Breaker <span class="highlight">Lock Mechanism</span></h1>
+                    <p class="subtitle">A sophisticated pattern for graceful degradation and automatic recovery in
+                        distributed systems</p>
+
+                    <div class="logo"></div>
+
+                    <p>Modern distributed systems require robust failure handling mechanisms.<br>
+                        Learn how circuit breaker patterns can protect your system and ensure message integrity.</p>
+                </div>
+            </div>
+
+            <!-- Slide 2: Architecture Overview -->
+            <div class="slide">
+                <h2>Architecture Overview</h2>
+                <p>Multi-process stream monitoring system with coordinated circuit breaker pattern using Worker
+                    orchestration, instrumentation hooks, and comprehensive error handling.</p>
+
+                <div class="components-grid">
+                    <div class="component-section">
+                        <h4>🔒 Lock Events & Instrumentation</h4>
+                        <div class="component-item">
+                            <h5>kafka_lock_event</h5>
+                            <p>Controls Kafka message consumption + instrumentation.lock_set("kafka")</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>data_api_lock_event</h5>
+                            <p>Controls queue and cache processing + instrumentation.lock_set("data_api")</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>Individual Lock Control</h5>
+                            <p>set_kafka_lock(), clear_data_api_lock(), with granular control</p>
+                        </div>
+                    </div>
+
+                    <div class="component-section">
+                        <h4>⚙️ Worker Process Architecture</h4>
+                        <div class="component-item">
+                            <h5>Kafka Consumer Worker</h5>
+                            <p>Async process with topic-refresh loop, rebalance listener, cooperative sleep</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>Queue Consumer Worker</h5>
+                            <p>Sync process with MessageManager, GRPC client, retry handler</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>Cache Consumer Worker</h5>
+                            <p>Async process reading cached messages, clearing kafka locks on empty</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>ServiceManager</h5>
+                            <p>Orchestrates Worker lifecycle with Event coordination</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="warning">
+                    <h4>🔄 Key Components</h4>
+                    <p><strong>ErrorHandler:</strong> Type-based dispatch (JSON, KeyError, ValueError) → Dead Letter<br>
+                        <strong>MessageFilterService:</strong> Split batches by IgnoreDuplicate flag<br>
+                        <strong>GRPCClientManager:</strong> Channel readiness + MessageBuilderRegistry<br>
+                        <strong>Instrumentation:</strong> Metrics hooks throughout (lock_set, message_rate,
+                        process_status)
+                    </p>
+                </div>
+            </div>
+
+            <!-- Slide 3: Lock Types & Components -->
+            <div class="slide">
+                <h2>Lock Types & Components</h2>
+
+                <div class="component-section" style="margin-bottom: 30px;">
+                    <h4>🚦 LockManager API & Instrumentation</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px;">
+                        <div>
+                            <div class="component-item">
+                                <h5>Individual Lock Controls</h5>
+                                <p><strong>set_kafka_lock():</strong> Stops Kafka consumption</p>
+                                <p><strong>set_data_api_lock():</strong> Stops queue/cache processing</p>
+                                <p><strong>clear_kafka_lock():</strong> Resumes Kafka consumption</p>
+                                <p><strong>clear_data_api_lock():</strong> Resumes queue processing</p>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="component-item">
+                                <h5>Coordinated Lock Controls</h5>
+                                <p><strong>set_all_locks():</strong> Emergency stop - both systems</p>
+                                <p><strong>clear_all_locks():</strong> Recovery - clear data_api first, then kafka</p>
+                                <p><strong>Instrumentation:</strong> Every lock operation calls
+                                    instrumentation.lock_set() or lock_clear()</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="code-block">
+                    <span class="keyword">class</span> <span class="function">LockManager</span>:
+                    <span class="keyword">def</span> <span class="function">set_kafka_lock</span>(<span
+                        class="keyword">self</span>) -> <span class="keyword">None</span>:
+                    <span class="keyword">self</span>.kafka_lock_event.set()
+                    instrumentation.lock_set(<span class="string">"kafka"</span>)
+
+                    <span class="keyword">def</span> <span class="function">clear_all_locks</span>(<span
+                        class="keyword">self</span>) -> <span class="keyword">None</span>:
+                    <span class="keyword">self</span>.clear_data_api_lock() <span class="comment"># Clear data API
+                        first</span>
+                    <span class="keyword">self</span>.clear_kafka_lock() <span class="comment"># Then clear kafka</span>
+                    instrumentation.lock_clear(<span class="string">"kafka"</span>)
+                    instrumentation.lock_clear(<span class="string">"data_api"</span>)
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+                    <div class="component-section">
+                        <h4>🎯 ErrorHandler & Dead Letter</h4>
+                        <div class="component-item">
+                            <h5>Type-Based Error Dispatch</h5>
+                            <p>JSON.JSONDecodeError → Dead Letter</p>
+                            <p>KeyError → Missing field handling</p>
+                            <p>ValueError/TypeError → Data validation</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>DeadLetterProducer</h5>
+                            <p>Non-retryable errors → dead-letter-topic</p>
+                            <p>Duplicate messages (when ignore=false)</p>
+                        </div>
+                    </div>
+
+                    <div class="component-section">
+                        <h4>🔧 MessageFilterService</h4>
+                        <div class="component-item">
+                            <h5>IgnoreDuplicate Filtering</h5>
+                            <p>Splits message batches by IgnoreDuplicate flag</p>
+                            <p>ignore_duplicate_batch → tolerate ALREADY_EXISTS</p>
+                            <p>standard_batch → send duplicates to dead letter</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 4: Process Coordination -->
+            <div class="slide">
+                <h2>Process Coordination & Worker Orchestration</h2>
+
+                <div class="resources-grid">
+                    <div class="resource-card">
+                        <h5>Kafka Consumer Worker</h5>
+                        <p><strong>Async Process:</strong> topic-refresh loop, ConsumerRebalanceLogger,
+                            cooperative_sleep()</p>
+                        <p><strong>Lock Response:</strong> kafka_lock_event.is_set() → sleep(0.3)</p>
+                    </div>
+                    <div class="resource-card">
+                        <h5>Queue Consumer Worker</h5>
+                        <p><strong>Sync Process:</strong> MessageManager, GRPCOperationHandler, RetryHandler</p>
+                        <p><strong>Processing Mode:</strong> ThreadPoolExecutor (parallel) when
+                            shared_worker_threading_flag=True, else sequential</p>
+                        <p><strong>Lock Response:</strong> Sets locks on GRPC failures, clears on success</p>
+                    </div>
+                    <div class="resource-card">
+                        <h5>Cache Consumer Worker</h5>
+                        <p><strong>Async Process:</strong> get_message_from_cache(), clears kafka_lock on empty cache
+                        </p>
+                        <p><strong>Lock Response:</strong> data_api_lock_event.is_set() → skip queue insertion</p>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 30px;">
+                    <div class="component-section">
+                        <h4>🔄 Worker Lifecycle Management</h4>
+                        <div class="component-item">
+                            <h5>ServiceManager Orchestration</h5>
+                            <p>Creates Worker(Process) instances for each consumer</p>
+                            <p>Each Worker has multiprocessing.Event for shutdown coordination</p>
+                            <p>Async workers get asyncio.new_event_loop()</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>Cooperative Sleep Mechanisms</h5>
+                            <p><strong>cooperative_sleep():</strong> Async version with event.is_set() checks</p>
+                            <p><strong>cooperative_sleep_sync():</strong> Sync version for blocking code paths</p>
+                        </div>
+                    </div>
+
+                    <div class="component-section">
+                        <h4>📡 Kafka Advanced Features</h4>
+                        <div class="component-item">
+                            <h5>Topic-Refresh Loop</h5>
+                            <p>check_and_refresh_topics() monitors regex patterns</p>
+                            <p>Automatically subscribes to new matching topics</p>
+                            <p>Exponential backoff on metadata errors</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>ConsumerRebalanceLogger</h5>
+                            <p>on_partitions_revoked() → cleanup resources</p>
+                            <p>on_partitions_assigned() → log new assignments</p>
+                            <p>Force garbage collection (gc.collect()) on rebalance</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>Message Queue Wrapping</h5>
+                            <p>send_messages_to_queue() adds message_type + template</p>
+                            <p>Final structure: {message, message_type, template, topic}</p>
+                            <p>instrumentation.queue_update(size, "message_added")</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="code-block">
+                    <span class="comment"># Worker Event Coordination Example</span>
+                    <span class="keyword">class</span> <span class="function">Worker</span>(Process):
+                    <span class="keyword">def</span> <span class="function">start</span>(<span
+                        class="keyword">self</span>) -> <span class="keyword">None</span>:
+                    <span class="keyword">self</span>.event = Event()
+                    <span class="keyword">self</span>.event.set()
+                    <span class="keyword">super</span>().start()
+                    instrumentation.process_status(<span class="keyword">self</span>.worker_type, <span
+                        class="string">"active"</span>)
+
+                    <span class="keyword">def</span> <span class="function">stop</span>(<span
+                        class="keyword">self</span>, timeout: <span class="keyword">float</span> = <span
+                        class="string">5.0</span>) -> <span class="keyword">None</span>:
+                    <span class="keyword">self</span>.event.clear() <span class="comment"># Signal shutdown</span>
+                    <span class="keyword">self</span>.join(timeout)
+                    instrumentation.process_status(<span class="keyword">self</span>.worker_type, <span
+                        class="string">"inactive"</span>)
+                </div>
+            </div>
+
+            <!-- Slide 5: Lock Behavior -->
+            <div class="slide">
+                <h2>Lock Behavior & GRPC Integration</h2>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+                    <div class="component-section">
+                        <h4>⚡ Lock Triggering Scenarios</h4>
+
+                        <div style="margin-top: 15px;">
+                            <h5 style="color: #64b5f6; margin-bottom: 10px;">Kafka Lock Activation:</h5>
+                            <ul class="feature-list">
+                                <li><strong>GRPC Retry (on_retry):</strong> set_kafka_lock() during retries</li>
+                                <li><strong>Queue Backpressure:</strong> queue.qsize() >= shared_queue_enqueue_size</li>
+                                <li><strong>Cache Empty:</strong> kafka_lock_event.clear() when cache drained</li>
+                            </ul>
+                        </div>
+
+                        <div style="margin-top: 20px;">
+                            <h5 style="color: #64b5f6; margin-bottom: 10px;">Data API Lock Activation:</h5>
+                            <ul class="feature-list">
+                                <li><strong>Server Unavailable:</strong> GrpcServerNotConnectingException</li>
+                                <li><strong>Retry Exhaustion (on_final_failure):</strong> set_all_locks()</li>
+                                <li><strong>Queue Empty:</strong> data_api_lock_event.clear() when queue drained</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="component-section">
+                        <h4>🔧 GRPC Client & Builder Registry</h4>
+                        <div class="component-item">
+                            <h5>GRPCClientManager</h5>
+                            <p>is_server_available() → channel_ready_future(timeout)</p>
+                            <p>measurement_stub + alert_stub initialization</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>MessageBuilderRegistry</h5>
+                            <p>Lazy-loaded builders per MessageType</p>
+                            <p>DAQ_OPC_UA, PRIME_DAQ, ANALYTICS_ALERT, etc.</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>RetryHandler Full Signature</h5>
+                            <p>execute_with_retry(operation, is_retryable_error, on_retry, on_final_failure, event,
+                                sleep_func)</p>
+                            <p>Returns (success, result_or_error)</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="code-block">
+                    <span class="comment"># Complete Retry Handler with Callbacks</span>
+                    <span class="keyword">def</span> <span class="function">complete_grpc_call_with_retry</span>(<span
+                        class="keyword">self</span>, ...):
+                    <span class="keyword">def</span> <span class="function">on_retry</span>(attempt: <span
+                        class="keyword">int</span>, error: Exception, backoff: <span class="keyword">float</span>) ->
+                    <span class="keyword">None</span>:
+                    <span class="keyword">self</span>.lock_manager.set_kafka_lock() <span class="comment"># Stop new
+                        messages</span>
+                    logger.warning(<span class="string">f"gRPC {grpc_call} {error.code().name} (attempt
+                        {attempt}/{MAX_RETRIES})"</span>)
+
+                    <span class="keyword">def</span> <span class="function">on_failure</span>(error: Exception) -> <span
+                        class="keyword">None</span>:
+                    logger.warning(<span class="string">"Data API not available, setting lock events"</span>)
+                    <span class="keyword">self</span>.lock_manager.set_all_locks()
+                    <span class="keyword">self</span>._cache_raw(raw_message) <span class="comment"># Cache for later
+                        retry</span>
+
+                    success, _ = <span class="keyword">self</span>.retry_handler.execute_with_retry(
+                    operation=grpc_operation,
+                    is_retryable_error=<span class="keyword">lambda</span> e: e.code() <span class="keyword">in</span>
+                    (DEADLINE_EXCEEDED, UNAVAILABLE),
+                    on_retry=on_retry,
+                    on_final_failure=on_failure,
+                    event=event,
+                    sleep_func=<span class="keyword">self</span>._cooperative_sleep_sync
+                    )
+                </div>
+            </div>
+
+            <!-- Slide 6: Error Handling & Recovery -->
+            <div class="slide">
+                <h2>Error Handling & Recovery</h2>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+                    <div class="component-section">
+                        <h4>🔧 Multi-Layer Error Handling</h4>
+                        <div class="component-item">
+                            <h5>ErrorHandler Type Dispatch</h5>
+                            <p><strong>json.JSONDecodeError:</strong> Malformed message → Dead Letter</p>
+                            <p><strong>KeyError:</strong> Missing required fields → Dead Letter</p>
+                            <p><strong>ValueError/TypeError:</strong> Data validation → Dead Letter</p>
+                            <p><strong>Generic Exception:</strong> Fallback → Dead Letter</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>GRPC Error Handling</h5>
+                            <p><strong>ALREADY_EXISTS:</strong> Check IgnoreDuplicate flag</p>
+                            <p><strong>UNAVAILABLE/DEADLINE_EXCEEDED:</strong> Retryable → Cache + Retry</p>
+                            <p><strong>Other StatusCodes:</strong> Non-retryable → Dead Letter</p>
+                        </div>
+                    </div>
+
+                    <div class="component-section">
+                        <h4>🔄 Cache Reading & Recovery Flow</h4>
+                        <div class="component-item">
+                            <h5>Cache Consumer Process</h5>
+                            <p><strong>get_message_from_cache():</strong> JSON decode with EnumDecoder</p>
+                            <p><strong>consume_cache_messages():</strong> Batch processing up to cache_batch_size</p>
+                            <p><strong>Empty Cache:</strong> kafka_lock_event.clear() to resume consumption</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>Dead Letter Production</h5>
+                            <p><strong>Topic:</strong> shared_kafka_dead_letter_topic</p>
+                            <p><strong>Payload:</strong> {msg, grpc_api_call_name, request, error}</p>
+                            <p><strong>Instrumentation:</strong> message_rate, delivery callbacks</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="code-block">
+                    <span class="comment"># ErrorHandler Type-Based Dispatch</span>
+                    <span class="keyword">class</span> <span class="function">ErrorHandler</span>:
+                    <span class="keyword">def</span> <span class="function">__init__</span>(<span
+                        class="keyword">self</span>, dead_letter_producer):
+                    <span class="keyword">self</span>.error_map = {
+                    json.JSONDecodeError: <span class="keyword">self</span>._handle_json_error,
+                    KeyError: <span class="keyword">self</span>._handle_key_error,
+                    ValueError: <span class="keyword">self</span>._handle_value_error,
+                    TypeError: <span class="keyword">self</span>._handle_type_error,
+                    }
+
+                    <span class="keyword">def</span> <span class="function">handle_error</span>(<span
+                        class="keyword">self</span>, error, message, grpc_call, request_json):
+                    handler = <span class="keyword">self</span>.error_map.get(<span class="keyword">type</span>(error),
+                    <span class="keyword">self</span>._handle_generic_error)
+                    handler(error, message, grpc_call, request_json)
+
+                    <span class="comment"># Cache Recovery with Lock Clearing</span>
+                    <span class="keyword">async def</span> <span class="function">consume_cache_messages</span>(queue,
+                    event, kafka_lock_event):
+                    <span class="keyword">while</span> event.is_set():
+                    message = get_message_from_cache()
+                    <span class="keyword">if</span> message:
+                    messages.append(message)
+                    <span class="keyword">else</span>:
+                    <span class="keyword">if</span> kafka_lock_event.is_set():
+                    kafka_lock_event.clear() <span class="comment"># Resume Kafka consumption</span>
+                    <span class="keyword">break</span>
+                </div>
+
+                <div class="warning">
+                    <h4>🎯 Instrumentation Throughout</h4>
+                    <p><strong>Lock Operations:</strong> instrumentation.lock_set/clear() on every lock change<br>
+                        <strong>Message Flow:</strong> instrumentation.message_rate() for kafka_consumed,
+                        queue_processed, cache_retrieved<br>
+                        <strong>Process Status:</strong> instrumentation.process_status() for worker lifecycle<br>
+                        <strong>Queue Monitoring:</strong> instrumentation.queue_update() on size changes
+                    </p>
+                </div>
+            </div>
+
+            <!-- Slide 7: Benefits & Conclusion -->
+            <div class="slide">
+                <h2>Benefits & Conclusion</h2>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
+                    <div>
+                        <h3>🛡️ Graceful Degradation</h3>
+                        <ul class="feature-list">
+                            <li>Prevents cascade failures across components</li>
+                            <li>Resource protection during outages</li>
+                            <li>Message integrity through caching and dead letter mechanisms</li>
+                        </ul>
+
+                        <h3 style="margin-top: 30px;">⚡ Operational Resilience</h3>
+                        <ul class="feature-list">
+                            <li>Backpressure handling prevents memory exhaustion</li>
+                            <li>Exponential backoff with configurable limits</li>
+                            <li>Clear state visibility for operational debugging</li>
+                        </ul>
+                    </div>
+
+                    <div>
+                        <h3>🔄 Automatic Recovery</h3>
+                        <ul class="feature-list">
+                            <li>Self-healing system resumes normal operation automatically</li>
+                            <li>Immediate processing on server recovery</li>
+                            <li>Coordinated lock clearing prevents system overload</li>
+                        </ul>
+
+                        <div class="warning" style="margin-top: 30px;">
+                            <h4>🎯 Key Takeaway</h4>
+                            <p>This dual-lock circuit breaker mechanism provides a robust foundation for handling
+                                distributed system failures while maintaining message integrity and enabling automatic
+                                recovery.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 8: Failure Scenario Walkthrough -->
+            <div class="slide">
+                <h2>Failure Scenario Walkthrough</h2>
+                <p>Step-by-step analysis of how the circuit breaker handles a typical Data API outage with actual
+                    implementation details</p>
+
+                <div class="component-section" style="margin-bottom: 20px;">
+                    <h4>📚 Scenario: Data API Goes Down During Peak Load</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px;">
+                        <div>
+                            <h5 style="color: #64b5f6; margin-bottom: 10px;">Initial State (T=0s):</h5>
+                            <ul class="feature-list">
+                                <li>Kafka producing 1000 msg/sec → instrumentation.message_rate("kafka_consumed", n)
+                                </li>
+                                <li>Queue has 500 messages → instrumentation.queue_update(size, "message_added")</li>
+                                <li>GRPCClientManager.is_server_available() → True</li>
+                                <li>All locks cleared → instrumentation.lock_clear("kafka"), lock_clear("data_api")</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h5 style="color: #64b5f6; margin-bottom: 10px;">Data API Failure (T=5s):</h5>
+                            <ul class="feature-list">
+                                <li>GRPC calls → StatusCode.UNAVAILABLE</li>
+                                <li>Queue consumer detects channel_ready_future timeout</li>
+                                <li>RetryHandler.execute_with_retry() activates</li>
+                                <li>on_retry callback → lock_manager.set_kafka_lock() +
+                                    instrumentation.lock_set("kafka")</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="component-section">
+                        <h4>⚡ Timeline: First 30 Seconds</h4>
+                        <div class="code-block" style="font-size: 11px;">
+                            <span class="comment">T=5s - GrpcServerNotConnectingException</span>
+                            <span class="comment">T=6s - Retry 1/5 → set_kafka_lock() + instrumentation</span>
+                            <span class="comment">T=8s - Retry 2/5 (backoff: 2s) → cooperative_sleep_sync()</span>
+                            <span class="comment">T=12s - Retry 3/5 (backoff: 4s)</span>
+                            <span class="comment">T=20s - Retry 4/5 (backoff: 8s)</span>
+                            <span class="comment">T=33s - on_final_failure triggered</span>
+                            <span class="comment"> → set_all_locks() + instrumentation.lock_set("data_api")</span>
+                            <span class="comment"> → _cache_raw(message) with EnumEncoder</span>
+                            <span class="comment"> → Queue processing STOPPED</span>
+                        </div>
+                    </div>
+
+                    <div class="component-section">
+                        <h4>🔄 Recovery Sequence</h4>
+                        <div class="code-block" style="font-size: 11px;">
+                            <span class="comment">T=120s - Data API channel_ready_future succeeds</span>
+                            <span class="comment">T=125s - Cache consumer: get_message_from_cache()</span>
+                            <span class="comment"> → consume_cache_messages() batching</span>
+                            <span class="comment"> → Server availability check succeeds</span>
+                            <span class="comment"> → clear_all_locks() (data_api first, then kafka)</span>
+                            <span class="comment">T=126s - kafka_lock_event.clear() →
+                                instrumentation.lock_clear("kafka")</span>
+                            <span class="comment">T=127s - Cached messages → queue → MessageFilterService</span>
+                            <span class="comment">T=130s - Normal operation →
+                                instrumentation.message_rate("queue_processed", n)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="warning">
+                    <h4>🎯 Key Implementation Details</h4>
+                    <p><strong>Message Preservation:</strong> During outage, ~120,000 messages handled via 3 paths:<br>
+                        • <strong>Kafka Queue:</strong> Buffered due to kafka_lock_event.is_set() check<br>
+                        • <strong>Cache Storage:</strong> Failed messages → _cache_raw() with JSON+EnumEncoder<br>
+                        • <strong>Dead Letter:</strong> Non-retryable errors → DeadLetterProducer.produce_message()<br>
+                        <strong>Zero Data Loss:</strong> ErrorHandler type dispatch + MessageFilterService
+                        IgnoreDuplicate handling
+                    </p>
+                </div>
+            </div>
+
+            <!-- Slide 9: Configuration Tuning Guide -->
+            <div class="slide">
+                <h2>Configuration Tuning Guide</h2>
+                <p>Critical parameters and recommended values for different deployment scenarios</p>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+                    <div class="component-section">
+                        <h4>⚙️ Retry Configuration</h4>
+                        <div class="component-item">
+                            <h5>MAX_RETRIES</h5>
+                            <p><strong>Default:</strong> 5 attempts</p>
+                            <p><strong>Low latency env:</strong> 3 (faster failure detection)</p>
+                            <p><strong>High latency env:</strong> 7 (more tolerance)</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>INITIAL_BACKOFF_S</h5>
+                            <p><strong>Default:</strong> 1.0s</p>
+                            <p><strong>High throughput:</strong> 0.5s (faster recovery)</p>
+                            <p><strong>Resource constrained:</strong> 2.0s (less aggressive)</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>RPC_DEADLINE_S</h5>
+                            <p><strong>Default:</strong> 30s</p>
+                            <p><strong>Fast networks:</strong> 10s</p>
+                            <p><strong>Unreliable networks:</strong> 60s</p>
+                        </div>
+                    </div>
+
+                    <div class="component-section">
+                        <h4>🚦 Queue & Memory Management</h4>
+                        <div class="component-item">
+                            <h5>shared_queue_enqueue_size</h5>
+                            <p><strong>Default:</strong> 1000 messages</p>
+                            <p><strong>High memory systems:</strong> 5000</p>
+                            <p><strong>Memory constrained:</strong> 500</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>data_api_channel_ready_timeout</h5>
+                            <p><strong>Default:</strong> 5s</p>
+                            <p><strong>Fast detection:</strong> 2s</p>
+                            <p><strong>Stable networks:</strong> 10s</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>kafka_consume_interval_sec</h5>
+                            <p><strong>Default:</strong> 0.1s</p>
+                            <p><strong>High throughput:</strong> 0.05s</p>
+                            <p><strong>Low CPU:</strong> 0.5s</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>Cache & Queue Check Timeouts</h5>
+                            <p><strong>shared_cache_check_empty_timeout_sec:</strong> Broken into 1s chunks for
+                                responsiveness</p>
+                            <p><strong>shared_queue_check_empty_timeout_sec:</strong> Broken into 0.1s chunks</p>
+                            <p><strong>Reason:</strong> Prevents blocking shutdown signals during long waits</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="resources-grid" style="margin-top: 20px;">
+                    <div class="resource-card">
+                        <h5>🏎️ High Performance</h5>
+                        <p><strong>Use case:</strong> Low latency, high CPU</p>
+                        <div class="code-block" style="font-size: 10px; margin-top: 10px;">
+                            MAX_RETRIES = 3
+                            INITIAL_BACKOFF_S = 0.5
+                            queue_size = 5000
+                            consume_interval = 0.05
+                        </div>
+                    </div>
+                    <div class="resource-card">
+                        <h5>⚖️ Balanced</h5>
+                        <p><strong>Use case:</strong> Production default</p>
+                        <div class="code-block" style="font-size: 10px; margin-top: 10px;">
+                            MAX_RETRIES = 5
+                            INITIAL_BACKOFF_S = 1.0
+                            queue_size = 1000
+                            consume_interval = 0.1
+                        </div>
+                    </div>
+                    <div class="resource-card">
+                        <h5>🛡️ Conservative</h5>
+                        <p><strong>Use case:</strong> Unreliable networks</p>
+                        <div class="code-block" style="font-size: 10px; margin-top: 10px;">
+                            MAX_RETRIES = 7
+                            INITIAL_BACKOFF_S = 2.0
+                            queue_size = 500
+                            consume_interval = 0.5
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 10: Troubleshooting Common Issues -->
+            <div class="slide">
+                <h2>Troubleshooting Common Issues</h2>
+                <p>Diagnostic steps and solutions for typical circuit breaker problems with actual implementation
+                    context</p>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="component-section">
+                        <h4>🚨 Issue #1: Individual Locks Not Clearing</h4>
+                        <div class="component-item">
+                            <h5>Symptoms</h5>
+                            <p>kafka_lock_event.is_set() = True but queue is empty, or data_api_lock_event stuck</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>Root Cause</h5>
+                            <p>Cache consumer Worker crashed before kafka_lock_event.clear() or queue consumer died</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>Diagnosis</h5>
+                            <div class="code-block" style="font-size: 10px;">
+                                <span class="comment"># Check individual lock states</span>
+                                <span class="keyword">print</span>(<span class="string">f"Kafka lock:
+                                    {kafka_lock_event.is_set()}"</span>)
+                                <span class="keyword">print</span>(<span class="string">f"Data API lock:
+                                    {data_api_lock_event.is_set()}"</span>)
+
+                                <span class="comment"># Check Worker process status</span>
+                                <span class="keyword">for</span> worker <span class="keyword">in</span> [kafka_worker,
+                                queue_worker, cache_worker]:
+                                <span class="keyword">print</span>(<span class="string">f"{worker.name}:
+                                    alive={worker.is_alive()}, event_set={worker.event.is_set()}"</span>)
+
+                                <span class="comment"># Manual recovery</span>
+                                lock_manager.clear_all_locks()
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="component-section">
+                        <h4>⚡ Issue #2: Worker Process Crashes</h4>
+                        <div class="component-item">
+                            <h5>Symptoms</h5>
+                            <p>instrumentation.process_status shows "inactive", no logs from specific worker</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>Root Cause</h5>
+                            <p>Exception in Worker.run(), asyncio loop issues, or os._exit(0) called</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>Solution</h5>
+                            <div class="code-block" style="font-size: 10px;">
+                                <span class="comment"># Check process health via ServiceManager</span>
+                                <span class="keyword">if</span> <span class="keyword">not</span> worker.is_alive():
+                                logger.error(<span class="string">f"Worker {worker.name} died, restarting"</span>)
+                                worker.cleanup()
+                                worker = Worker(queue, task, args, worker_type=worker_type)
+                                worker.start()
+
+                                <span class="comment"># Check event loop state for async workers</span>
+                                <span class="keyword">if</span> worker.loop <span class="keyword">and</span>
+                                worker.loop.is_closed():
+                                logger.warning(<span class="string">"Event loop closed unexpectedly"</span>)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+                    <div class="component-section">
+                        <h4>🔍 Issue #3: Memory Leak Prevention</h4>
+                        <div class="component-item">
+                            <h5>Symptoms</h5>
+                            <p>RAM usage growing, queue.qsize() approaching system limits</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>Root Cause</h5>
+                            <p>Queue growth exceeding shared_queue_enqueue_size, no backpressure handling</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>Prevention (Built-in)</h5>
+                            <div class="code-block" style="font-size: 10px;">
+                                <span class="comment"># Built-in queue size monitoring in
+                                    consume_internal_queue_messages</span>
+                                <span class="keyword">if</span> queue.qsize() >= shared_queue_enqueue_size.value:
+                                logger.debug(<span class="string">f"Queue size {current_queue_size} >=
+                                    {shared_queue_enqueue_size.value}"</span>)
+                                <span class="keyword">await</span> cooperative_sleep(event, interval_sec) <span
+                                    class="comment"># Backpressure</span>
+
+                                <span class="comment"># Emergency: Drop oldest pattern (if implemented)</span>
+                                <span class="keyword">if</span> queue.qsize() > MAX_QUEUE_SIZE:
+                                <span class="keyword">try</span>:
+                                queue.get_nowait() <span class="comment"># Drop oldest message</span>
+                                <span class="keyword">except</span> Empty:
+                                <span class="keyword">pass</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="component-section">
+                        <h4>⏱️ Issue #4: Cache Check Timeouts</h4>
+                        <div class="component-item">
+                            <h5>Symptoms</h5>
+                            <p>Cache consumer sleeping too long, slow recovery on cache drain</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>Root Cause</h5>
+                            <p>shared_cache_check_empty_timeout_sec too high, blocking shutdown signals</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>Solution (Already Implemented)</h5>
+                            <div class="code-block" style="font-size: 10px;">
+                                <span class="comment"># Cooperative sleep breaks long timeouts into chunks</span>
+                                <span class="keyword">await</span> cooperative_sleep(
+                                event,
+                                shared_cache_check_empty_timeout_sec.value,
+                                step=<span class="string">1.0</span> <span class="comment"># 1-second
+                                    responsiveness</span>
+                                )
+
+                                <span class="comment"># Queue consumer similar pattern</span>
+                                sleep_chunk = <span class="string">0.1</span> <span class="comment"># 100ms
+                                    granularity</span>
+                                <span class="keyword">for</span> _ <span class="keyword">in</span> range(<span
+                                    class="keyword">int</span>(shared_queue_check_empty_timeout_sec.value /
+                                sleep_chunk)):
+                                <span class="keyword">if</span> <span class="keyword">not</span> event.is_set():
+                                <span class="keyword">return</span> <span class="comment"># Responsive to
+                                    shutdown</span>
+                                cooperative_sleep_sync(event, sleep_chunk, step=<span class="string">1</span>)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+                    <div class="component-section">
+                        <h4>🎯 Issue #5: Parallel Processing Bottlenecks</h4>
+                        <div class="component-item">
+                            <h5>Symptoms</h5>
+                            <p>ThreadPoolExecutor overwhelmed, shared_worker_threading_flag=True but slow processing</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>Root Cause</h5>
+                            <p>shared_worker_max_thread_count vs shared_worker_max_rpc_batch_size mismatch</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>Solution</h5>
+                            <div class="code-block" style="font-size: 10px;">
+                                <span class="comment"># process_messages_batch with ThreadPoolExecutor</span>
+                                <span class="keyword">if</span> shared_worker_threading_flag.value:
+                                batch_size = shared_worker_max_rpc_batch_size.value
+                                <span class="keyword">with</span> ThreadPoolExecutor(
+                                max_workers=shared_worker_max_thread_count.value
+                                ) <span class="keyword">as</span> executor:
+                                <span class="comment"># Chunk into sub-batches</span>
+                                <span class="keyword">for</span> batch_start <span class="keyword">in</span> range(<span
+                                    class="string">0</span>, <span class="keyword">len</span>(messages), batch_size):
+                                <span class="comment"># Submit to thread pool</span>
+                                executor.submit(process_func, ...)
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="component-section">
+                        <h4>⚡ Issue #6: Dead Letter Storms</h4>
+                        <div class="component-item">
+                            <h5>Symptoms</h5>
+                            <p>shared_kafka_dead_letter_topic overwhelmed, ErrorHandler._handle_*_error logs</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>Root Cause</h5>
+                            <p>Malformed messages causing JSON/KeyError/ValueError in bulk</p>
+                        </div>
+                        <div class="component-item">
+                            <h5>Prevention</h5>
+                            <div class="code-block" style="font-size: 10px;">
+                                <span class="comment"># Add message validation before ErrorHandler</span>
+                                <span class="keyword">try</span>:
+                                <span class="keyword">if</span> <span class="string">"message"</span> <span
+                                    class="keyword">not</span> <span class="keyword">in</span> message:
+                                <span class="keyword">raise</span> KeyError(<span class="string">"Bad Message key. Key
+                                    'message' not found"</span>)
+                                parsed = orjson.loads(message[<span class="string">"message"</span>])
+                                <span class="keyword">except</span> (json.JSONDecodeError, KeyError) <span
+                                    class="keyword">as</span> e:
+                                error_handler.handle_error(e, message, grpc_call, request_json)
+                                <span class="keyword">return</span> <span class="comment"># Don't process further</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="warning">
+                    <h4>🛠️ Debug Checklist with Implementation Details</h4>
+                    <ul class="feature-list">
+                        <li><strong>Check Worker processes:</strong> All 3 Worker.is_alive()? Event.is_set()?
+                            instrumentation.process_status shows "active"?</li>
+                        <li><strong>Verify GRPC connectivity:</strong> GRPCClientManager.is_server_available()?
+                            channel_ready_future timeout?</li>
+                        <li><strong>Monitor queue sizes:</strong> queue.qsize() vs shared_queue_enqueue_size?
+                            instrumentation.queue_update logs?</li>
+                        <li><strong>Review ErrorHandler logs:</strong> Type-specific error patterns?
+                            DeadLetterProducer.produce_message frequency?</li>
+                        <li><strong>Test manual recovery:</strong> lock_manager.clear_all_locks() + check individual
+                            clear_kafka_lock()</li>
+                        <li><strong>Cache state:</strong> get_message_from_cache() returning None? Cache batch
+                            processing working?</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Slide 11: Future Scope - Metrics & Monitoring -->
+            <div class="slide">
+                <h2>Current Instrumentation & Future Monitoring</h2>
+                <p>Existing instrumentation hooks throughout the codebase and planned Prometheus/Grafana integration</p>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+                    <div class="component-section">
+                        <h4>📊 Current Instrumentation (Already Implemented)</h4>
+                        <div class="component-item">
+                            <h5>Lock State Tracking</h5>
+                            <div class="code-block" style="font-size: 10px;">
+                                <span class="comment"># Already in LockManager</span>
+                                instrumentation.lock_set(<span class="string">"kafka"</span>)
+                                instrumentation.lock_clear(<span class="string">"data_api"</span>)
+
+                                <span class="comment"># Future: Export as Prometheus metrics</span>
+                                kafka_lock_active_duration_seconds
+                                data_api_lock_active_duration_seconds
+                            </div>
+                        </div>
+                        <div class="component-item">
+                            <h5>Message Flow Metrics</h5>
+                            <div class="code-block" style="font-size: 10px;">
+                                <span class="comment"># Already in Workers</span>
+                                instrumentation.message_rate(<span class="string">"kafka_consumed"</span>,
+                                len(total_messages))
+                                instrumentation.message_rate(<span class="string">"queue_processed"</span>,
+                                len(messages))
+                                instrumentation.message_rate(<span class="string">"cache_retrieved"</span>, <span
+                                    class="string">1</span>)
+
+                                <span class="comment"># Future: Aggregate to rates/counters</span>
+                                message_processing_rate_per_sec
+                                message_cache_hits_total
+                            </div>
+                        </div>
+                        <div class="component-item">
+                            <h5>Process & Queue Monitoring</h5>
+                            <div class="code-block" style="font-size: 10px;">
+                                <span class="comment"># Already in Worker lifecycle</span>
+                                instrumentation.process_status(worker_type, <span class="string">"active"</span>)
+                                instrumentation.queue_update(queue.qsize(), <span class="string">"message_added"</span>)
+
+                                <span class="comment"># Future: Process health dashboard</span>
+                                worker_process_status{type="kafka"}
+                                queue_size_current
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="component-section">
+                        <h4>📈 Future Prometheus/Grafana Integration</h4>
+                        <div style="margin-bottom: 15px;">
+                            <h5 style="color: #64b5f6;">Circuit Breaker Health Panel:</h5>
+                            <ul class="feature-list">
+                                <li><strong>Lock Duration:</strong> How long locks stay active (current:
+                                    instrumentation.lock_set/clear)</li>
+                                <li><strong>Recovery Timeline:</strong> Time between set_all_locks() and
+                                    clear_all_locks()</li>
+                                <li><strong>Error Rate:</strong> ErrorHandler dispatch frequency by type</li>
+                                <li><strong>Dead Letter Rate:</strong> DeadLetterProducer.produce_message() frequency
+                                </li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h5 style="color: #64b5f6;">Performance Dashboard:</h5>
+                            <ul class="feature-list">
+                                <li><strong>Message Throughput:</strong> kafka_consumed vs queue_processed rates</li>
+                                <li><strong>Cache Efficiency:</strong> cache_retrieved rate vs cache miss rate</li>
+                                <li><strong>Worker Health:</strong> process_status changes, restart frequency</li>
+                                <li><strong>GRPC Patterns:</strong> RetryHandler success/failure ratios</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="resources-grid" style="margin-top: 20px;">
+                    <div class="resource-card">
+                        <h5>🚨 Enhanced Alert Rules</h5>
+                        <div class="code-block" style="font-size: 9px; margin-top: 10px;">
+                            <span class="comment"># Based on current instrumentation</span>
+                            lock_active_duration > 300s
+
+                            <span class="comment"># Queue backpressure from queue_update</span>
+                            queue_size > shared_queue_enqueue_size
+
+                            <span class="comment"># Dead letter storm from ErrorHandler</span>
+                            dead_letter_rate > 10/min
+
+                            <span class="comment"># Worker process crashes</span>
+                            process_status != "active"
+                        </div>
+                    </div>
+                    <div class="resource-card">
+                        <h5>⚠️ Performance Thresholds</h5>
+                        <div class="code-block" style="font-size: 9px; margin-top: 10px;">
+                            <span class="comment"># Message rate disparity</span>
+                            kafka_consumed_rate - queue_processed_rate > 1000
+
+                            <span class="comment"># Cache processing stalled</span>
+                            cache_retrieved_rate < 1/min <span class="keyword">and</span> cache_not_empty
+
+                                <span class="comment"># GRPC retry storm</span>
+                                retry_attempts_rate > 5/min
+
+                                <span class="comment"># Topic refresh failures</span>
+                                topic_refresh_errors > 3 consecutive
+                        </div>
+                    </div>
+                    <div class="resource-card">
+                        <h5>📈 SLA Dashboards</h5>
+                        <div class="code-block" style="font-size: 9px; margin-top: 10px;">
+                            <span class="comment"># End-to-end latency</span>
+                            message_kafka_to_grpc_latency_p99
+
+                            <span class="comment"># System availability</span>
+                            (time_without_all_locks_set / total_time) * 100
+
+                            <span class="comment"># Message loss rate</span>
+                            dead_letter_rate / kafka_consumed_rate
+
+                            <span class="comment"># Recovery efficiency</span>
+                            cache_drain_time_p95
+                        </div>
+                    </div>
+                </div>
+
+                <div class="warning">
+                    <h4>🎯 Implementation Status & Next Steps</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px;">
+                        <div>
+                            <h5 style="color: #64b5f6;">✅ Already Instrumented:</h5>
+                            <ul class="feature-list" style="font-size: 14px;">
+                                <li>All lock state changes (set/clear)</li>
+                                <li>Message flow rates (consumed/processed/cached)</li>
+                                <li>Queue size changes</li>
+                                <li>Worker process lifecycle</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h5 style="color: #64b5f6;">🚀 Need to Add:</h5>
+                            <ul class="feature-list" style="font-size: 14px;">
+                                <li>Prometheus exporter for instrumentation.* calls</li>
+                                <li>Grafana dashboard templates</li>
+                                <li>Alert rule definitions</li>
+                                <li>SLA calculation logic</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="navigation">
+                <button class="nav-btn" id="toggleSlidesBtn" onclick="toggleSidebar()">📋 Slides</button>
+                <button class="nav-btn" id="prevBtn" onclick="changeSlide(-1)">‹ Previous</button>
+                <span class="slide-counter">
+                    <span id="currentSlide">1</span> / <span id="totalSlides">11</span>
+                </span>
+                <button class="nav-btn" id="nextBtn" onclick="changeSlide(1)">Next ›</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentSlideIndex = 0;
+        const slides = document.querySelectorAll('.slide');
+        const navItems = document.querySelectorAll('.slide-nav li');
+        const totalSlides = slides.length;
+
+        document.getElementById('totalSlides').textContent = totalSlides;
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('mainContent');
+            const toggleBtn = document.getElementById('toggleSlidesBtn');
+
+            sidebar.classList.toggle('collapsed');
+            mainContent.classList.toggle('fullscreen');
+
+            if (sidebar.classList.contains('collapsed')) {
+                toggleBtn.innerHTML = '📋 Show Slides';
+            } else {
+                toggleBtn.innerHTML = '📋 Slides';
+            }
+
+            // Remove focus from the toggle button to prevent lingering border
+            document.activeElement.blur();
+        }
+
+        function showSlide(index) {
+            // Top-align only slides 10 & 11 (zero-based indexes 9 and 10)
+            const mainContent = document.getElementById('mainContent');
+            if (index === 9 || index === 10) {
+                mainContent.classList.add('top-align');
+            } else {
+                mainContent.classList.remove('top-align');
+            }
+            // Hide all slides
+            slides.forEach(slide => slide.classList.remove('active'));
+            navItems.forEach(item => item.classList.remove('active'));
+
+            // Show current slide
+            slides[index].classList.add('active');
+            navItems[index].classList.add('active');
+
+            // Update navigation
+            document.getElementById('currentSlide').textContent = index + 1;
+            document.getElementById('prevBtn').disabled = index === 0;
+            document.getElementById('nextBtn').disabled = index === totalSlides - 1;
+
+            // Scroll to top of main content when changing slides
+            document.getElementById('mainContent').scrollTop = 0;
+        }
+
+        function changeSlide(direction) {
+            const newIndex = currentSlideIndex + direction;
+            if (newIndex >= 0 && newIndex < totalSlides) {
+                currentSlideIndex = newIndex;
+                showSlide(currentSlideIndex);
+            }
+        }
+
+        // Sidebar navigation
+        navItems.forEach((item, index) => {
+            item.addEventListener('click', () => {
+                currentSlideIndex = index;
+                showSlide(currentSlideIndex);
+            });
+        });
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') {
+                e.preventDefault(); // Prevent default spacebar scrolling
+                changeSlide(1);
+            } else if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                changeSlide(-1);
+            }
+        });
+
+        // Initialize
+        showSlide(0);
+    </script>
+</body>
+
+</html>

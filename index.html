@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream Monitor Instrumentation - Presentations</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 1.1rem;
+        }
+
+        .presentations-grid {
+            display: grid;
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .presentation-folder {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            border: 2px solid #e9ecef;
+            transition: all 0.3s ease;
+        }
+
+        .presentation-folder:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border-color: #667eea;
+        }
+
+        .folder-title {
+            color: #333;
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .folder-icon {
+            font-size: 1.8rem;
+        }
+
+        .presentation-links {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .presentation-link {
+            display: inline-block;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .presentation-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+            text-decoration: none;
+            color: white;
+        }
+
+        .coming-soon {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            border: 2px dashed #dee2e6;
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            .presentation-links {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .presentation-link {
+                width: 100%;
+                max-width: 250px;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>📊 Stream Monitor Instrumentation</h1>
+        <p class="subtitle">Interactive Presentations & Documentation</p>
+
+        <div class="presentations-grid">
+            <!-- Stream Monitor Presentation -->
+            <div class="presentation-folder">
+                <h2 class="folder-title">
+                    <span class="folder-icon">📈</span>
+                    Stream Monitor
+                </h2>
+                <div class="presentation-links">
+                    <a href="Stream-Monitor/presentation.html" class="presentation-link">
+                        📖 Main Presentation
+                    </a>
+                    <a href="Stream-Monitor/flow.html" class="presentation-link">
+                        🔄 Flow Diagram
+                    </a>
+                </div>
+            </div>
+
+            <!-- Placeholder for future presentations -->
+            <div class="coming-soon">
+                <h3>🚀 More Presentations Coming Soon</h3>
+                <p>Additional instrumentation presentations will be added here as they become available.</p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Last updated: July 8, 2025</p>
+            <p>Navigate through different presentations to explore various aspects of stream monitoring instrumentation.
+            </p>
+        </div>
+    </div>
+</body>
+
+</html>

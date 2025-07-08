@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream Monitor Lock Mechanism Flowchart</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0a;
+            color: #e0e0e0;
+            overflow-x: auto;
+            min-width: 1200px;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            background: #111;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 0 40px rgba(0, 255, 255, 0.1);
+            overflow-x: auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #00ffff;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+        }
+
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+
+        .legend-box {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+
+        .flowchart {
+            position: relative;
+            min-height: 1600px;
+            min-width: 1850px;
+            background: #1a1a1a;
+            border-radius: 8px;
+            padding: 60px;
+            overflow: visible;
+        }
+
+        .node {
+            position: absolute;
+            padding: 18px 28px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            z-index: 10;
+            text-align: center;
+            white-space: normal;
+            min-width: 150px;
+            line-height: 1.4;
+        }
+
+        .node:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+            z-index: 20;
+        }
+
+        .process-node {
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            border: 2px solid #3498db;
+            color: white;
+        }
+
+        .lock-node {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            border: 2px solid #ff6b6b;
+            color: white;
+        }
+
+        .lock-active {
+            animation: pulse 2s infinite;
+            background: linear-gradient(135deg, #ff0000, #cc0000);
+            box-shadow: 0 0 30px rgba(255, 0, 0, 0.5);
+        }
+
+        .decision-node {
+            background: linear-gradient(135deg, #f39c12, #e67e22);
+            border: 2px solid #ffcc00;
+            color: white;
+            clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+            padding: 30px;
+            width: 140px;
+            height: 85px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            white-space: normal;
+            line-height: 1.15;
+            font-size: 12px;
+        }
+
+        .action-node {
+            background: linear-gradient(135deg, #27ae60, #229954);
+            border: 2px solid #2ecc71;
+            color: white;
+        }
+
+        .error-node {
+            background: linear-gradient(135deg, #9b59b6, #8e44ad);
+            border: 2px solid #a855f7;
+            color: white;
+        }
+
+        .cache-node {
+            background: linear-gradient(135deg, #00bcd4, #0097a7);
+            border: 2px solid #00ffff;
+            color: white;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 30px rgba(255, 0, 0, 0.5);
+            }
+            50% {
+                box-shadow: 0 0 50px rgba(255, 0, 0, 0.8);
+            }
+            100% {
+                box-shadow: 0 0 30px rgba(255, 0, 0, 0.5);
+            }
+        }
+
+        .arrow-path {
+            stroke: #666;
+            stroke-width: 2;
+            fill: none;
+            marker-end: url(#arrowhead);
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .arrow-path.active {
+            stroke: #00ffff;
+            stroke-width: 3;
+            filter: drop-shadow(0 0 5px #00ffff);
+            stroke-dasharray: 10;
+            animation: dash 0.5s linear infinite;
+        }
+
+        .arrow-path.error-flow {
+            stroke: #ff6b6b;
+            stroke-dasharray: 5;
+        }
+
+        .arrow-path.success-flow {
+            stroke: #2ecc71;
+        }
+
+        .arrow-path.loop-flow {
+            stroke: #666;
+            stroke-dasharray: 10 5;
+        }
+
+        .arrow-path.cross-section {
+            stroke: #666;
+            stroke-dasharray: 2 4;
+            opacity: 0.6;
+        }
+
+        @keyframes dash {
+            to {
+                stroke-dashoffset: -20;
+            }
+        }
+
+        .arrow-label {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.95);
+            color: #fff;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            pointer-events: none;
+            white-space: nowrap;
+            z-index: 15;
+            border: 1px solid #333;
+            font-weight: 500;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .arrow-label.decision-label {
+            top: -20px !important;
+            font-weight: 600;
+            background: rgba(0, 0, 0, 1);
+        }
+
+        .instrumentation-badge {
+            position: absolute;
+            background: #ff4757;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 9px;
+            font-weight: 600;
+            z-index: 16;
+            pointer-events: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.95);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            max-width: 300px;
+            line-height: 1.5;
+            border: 1px solid #333;
+            z-index: 100;
+        }
+
+        .controls {
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #2a5298, #1e3c72);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 0 10px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        .section-divider {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px dashed #333;
+            border-radius: 8px;
+            z-index: 1;
+        }
+
+        .section-label {
+            position: absolute;
+            top: -12px;
+            left: 20px;
+            background: #1a1a1a;
+            padding: 0 10px;
+            color: #666;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .error-region {
+            position: absolute;
+            background: rgba(255, 107, 107, 0.05);
+            border: 2px dashed #ff6b6b;
+            border-radius: 12px;
+            z-index: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Stream Monitor Lock Mechanism Flowchart - Improved</h1>
+
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-box" style="background: linear-gradient(135deg, #1e3c72, #2a5298);"></div>
+                <span>Process</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-box" style="background: linear-gradient(135deg, #e74c3c, #c0392b);"></div>
+                <span>Lock State</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-box" style="background: linear-gradient(135deg, #f39c12, #e67e22);"></div>
+                <span>Decision</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-box" style="background: linear-gradient(135deg, #27ae60, #229954);"></div>
+                <span>Action</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-box" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);"></div>
+                <span>Error Handler</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-box" style="background: linear-gradient(135deg, #00bcd4, #0097a7);"></div>
+                <span>Cache Operation</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-box" style="background: linear-gradient(135deg, #ff6b6b, #d63447);"></div>
+                <span>Validation</span>
+            </div>
+        </div>
+
+        <div class="flowchart" id="flowchart">
+            <!-- Sections will be dynamically created -->
+        </div>
+
+        <div class="controls">
+            <button class="btn" onclick="simulateNormalFlow()">Simulate Normal Flow</button>
+            <button class="btn" onclick="simulateErrorFlow()">Simulate Error Flow</button>
+            <button class="btn" onclick="simulateRecoveryFlow()">Simulate Recovery Flow</button>
+            <button class="btn" onclick="resetAnimation()">Reset</button>
+        </div>
+
+        <div class="tooltip" id="tooltip"></div>
+    </div>
+
+    <svg style="position: absolute; width: 0; height: 0;">
+        <defs>
+            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                <polygon points="0 0, 10 3.5, 0 7" fill="#666" />
+            </marker>
+        </defs>
+    </svg>
+
+    <script>
+        // Node definitions with positions
+        const nodes = [
+            // Kafka Consumer nodes
+            { id: 'kafka-start', type: 'process-node', text: 'Kafka Consumer\nStart', x: 265, y: 60, tooltip: 'Kafka consumer process starts and initializes connection' },
+            { id: 'check-queue', type: 'decision-node', text: 'Queue\nFull?', x: 270, y: 180, tooltip: 'Check if internal queue has reached capacity threshold' },
+            { id: 'check-kafka-lock', type: 'decision-node', text: 'Kafka Lock\nActive?', x: 270, y: 350, tooltip: 'Check if kafka_lock_event is set (prevents consumption)' },
+            { id: 'consume-kafka', type: 'action-node', text: 'Consume from\nKafka', x: 260, y: 500, tooltip: 'Fetch messages from Kafka topics' },
+            { id: 'send-to-queue', type: 'action-node', text: 'Send to Queue', x: 270, y: 610, tooltip: 'Put messages into internal queue for processing' },
+
+            // Queue Consumer nodes with validation
+            { id: 'queue-start', type: 'process-node', text: 'Queue Consumer\nStart', x: 835, y: 60, tooltip: 'Queue consumer process starts' },
+            { id: 'get-from-queue', type: 'action-node', text: 'Get Messages\nfrom Queue', x: 825, y: 170, tooltip: 'Retrieve batch of messages from internal queue' },
+            { id: 'validate-message', type: 'decision-node', text: 'Valid Message\nJSON?', x: 840, y: 290, tooltip: 'Validate message JSON structure and required fields' },
+            { id: 'check-server', type: 'decision-node', text: 'GRPC Server\nAvailable?', x: 840, y: 430, tooltip: 'Check if Data API server is reachable' },
+            { id: 'process-message', type: 'action-node', text: 'Process Message', x: 830, y: 570, tooltip: 'Transform and prepare message for Data API' },
+            { id: 'send-grpc', type: 'action-node', text: 'Send via GRPC', x: 840, y: 680, tooltip: 'Send message to Data API via GRPC' },
+            { id: 'grpc-success', type: 'decision-node', text: 'GRPC\nSuccess?', x: 840, y: 810, tooltip: 'Check if GRPC call was successful' },
+            { id: 'clear-locks', type: 'action-node', text: 'Clear All Locks', x: 690, y: 950, tooltip: 'Clear both kafka and data API locks on success' },
+
+            // Error handling nodes
+            { id: 'server-retry', type: 'error-node', text: 'Retry with\nBackoff', x: 1090, y: 430, tooltip: 'Exponential backoff retry logic' },
+            { id: 'set-kafka-lock', type: 'lock-node', text: 'Set Kafka Lock', x: 1090, y: 550, tooltip: 'Set kafka_lock_event to stop consumption' },
+            { id: 'max-retries', type: 'decision-node', text: 'Max Retries\nReached?', x: 1080, y: 700, tooltip: 'Check if retry limit exceeded' },
+            { id: 'set-all-locks', type: 'lock-node', text: 'Set All Locks', x: 1090, y: 830, tooltip: 'Set both kafka and data API locks' },
+            { id: 'cache-message', type: 'cache-node', text: 'Cache Message', x: 1090, y: 980, tooltip: 'Store failed message in cache for later retry' },
+
+            // Cache Consumer nodes
+            { id: 'cache-start', type: 'process-node', text: 'Cache Consumer\nStart', x: 1405, y: 60, tooltip: 'Cache consumer process starts' },
+            { id: 'check-cache-queue', type: 'decision-node', text: 'Queue Full or\nAPI Down?', x: 1410, y: 180, tooltip: 'Check if conditions allow cache processing' },
+            { id: 'get-from-cache', type: 'cache-node', text: 'Get from Cache', x: 1395, y: 330, tooltip: 'Retrieve messages from cache storage' },
+            { id: 'cache-empty', type: 'decision-node', text: 'Cache\nEmpty?', x: 1410, y: 480, tooltip: 'Check if cache has messages' },
+            { id: 'add-to-queue', type: 'action-node', text: 'Add to Queue', x: 1405, y: 630, tooltip: 'Put cached messages back into queue' },
+
+            // Lock state nodes - moved up into lock management section
+            { id: 'kafka-lock-state', type: 'lock-node', text: 'kafka_lock_event', x: 710, y: 1380, tooltip: 'Controls Kafka message consumption' },
+            { id: 'data-api-lock-state', type: 'lock-node', text: 'data_api_lock_event', x: 1020, y: 1380, tooltip: 'Controls queue and cache processing' },
+
+            // Dead letter handling
+            { id: 'dead-letter', type: 'error-node', text: 'Dead Letter Topic', x: 840, y: 1100, tooltip: 'Send non-retryable messages to dead letter topic' }
+        ];
+
+        // Connection definitions with standardized types
+        const connections = [
+            // Kafka Consumer flow
+            { from: 'kafka-start', to: 'check-queue', label: '', type: 'normal', instrumentation: 'init' },
+            { from: 'check-queue', to: 'check-kafka-lock', label: 'No', type: 'success-flow', isDecision: true },
+            { from: 'check-queue', to: 'check-queue', label: 'Yes (wait)', type: 'loop-flow', curve: true, instrumentation: 'queue_update' },
+            { from: 'check-kafka-lock', to: 'consume-kafka', label: 'No', type: 'success-flow', isDecision: true },
+            { from: 'check-kafka-lock', to: 'check-queue', label: 'Yes (wait)', type: 'loop-flow', curve: true },
+            { from: 'consume-kafka', to: 'send-to-queue', label: '', type: 'normal', instrumentation: 'message_rate' },
+            { from: 'send-to-queue', to: 'check-queue', label: 'Loop', type: 'loop-flow', curve: true },
+
+            // Queue Consumer flow with validation
+            { from: 'queue-start', to: 'get-from-queue', label: '', type: 'normal' },
+            { from: 'get-from-queue', to: 'validate-message', label: '', type: 'normal' },
+            { from: 'validate-message', to: 'check-server', label: 'Yes', type: 'success-flow', isDecision: true },
+            { from: 'validate-message', to: 'dead-letter', label: 'No', type: 'error-flow', isDecision: true },
+            { from: 'check-server', to: 'process-message', label: 'Yes', type: 'success-flow', isDecision: true },
+            { from: 'check-server', to: 'server-retry', label: 'No', type: 'error-flow', isDecision: true },
+            { from: 'process-message', to: 'send-grpc', label: '', type: 'normal' },
+            { from: 'send-grpc', to: 'grpc-success', label: '', type: 'normal', instrumentation: 'message_rate' },
+            { from: 'grpc-success', to: 'clear-locks', label: 'Yes', type: 'success-flow', isDecision: true },
+            { from: 'grpc-success', to: 'dead-letter', label: 'Non-retryable', type: 'error-flow', isDecision: true },
+            { from: 'grpc-success', to: 'server-retry', label: 'Retryable', type: 'error-flow', isDecision: true },
+            { from: 'clear-locks', to: 'get-from-queue', label: 'Next', type: 'loop-flow', curve: true },
+
+            // Error handling flow
+            { from: 'server-retry', to: 'set-kafka-lock', label: '', type: 'error-flow' },
+            { from: 'set-kafka-lock', to: 'max-retries', label: '', type: 'error-flow' },
+            { from: 'max-retries', to: 'check-server', label: 'No (retry)', type: 'loop-flow', curve: true, isDecision: true },
+            { from: 'max-retries', to: 'set-all-locks', label: 'Yes', type: 'error-flow', isDecision: true },
+            { from: 'set-all-locks', to: 'cache-message', label: '', type: 'error-flow' },
+            { from: 'cache-message', to: 'get-from-queue', label: 'Wait', type: 'loop-flow', curve: true, instrumentation: 'process_status' },
+
+            // Cache Consumer flow
+            { from: 'cache-start', to: 'check-cache-queue', label: '', type: 'normal' },
+            { from: 'check-cache-queue', to: 'get-from-cache', label: 'No', type: 'success-flow', isDecision: true },
+            { from: 'check-cache-queue', to: 'check-cache-queue', label: 'Yes (wait)', type: 'loop-flow', curve: true, instrumentation: 'queue_update' },
+            { from: 'get-from-cache', to: 'cache-empty', label: '', type: 'normal' },
+            { from: 'cache-empty', to: 'add-to-queue', label: 'No', type: 'success-flow', isDecision: true },
+            { from: 'cache-empty', to: 'check-cache-queue', label: 'Yes (wait)', type: 'loop-flow', curve: true, instrumentation: 'process_status' },
+            { from: 'add-to-queue', to: 'get-from-cache', label: 'Next', type: 'loop-flow', curve: true, instrumentation: 'message_rate' },
+
+            // Lock state connections
+            { from: 'set-kafka-lock', to: 'kafka-lock-state', label: 'Activate', type: 'error-flow' },
+            { from: 'set-all-locks', to: 'kafka-lock-state', label: 'Activate', type: 'error-flow' },
+            { from: 'set-all-locks', to: 'data-api-lock-state', label: 'Activate', type: 'error-flow' },
+            { from: 'clear-locks', to: 'kafka-lock-state', label: 'Clear', type: 'success-flow' },
+            { from: 'clear-locks', to: 'data-api-lock-state', label: 'Clear', type: 'success-flow' },
+            { from: 'add-to-queue', to: 'data-api-lock-state', label: 'Clear', type: 'success-flow' },
+
+            // Queue to Cache interaction - cross-section flows
+            { from: 'send-to-queue', to: 'get-from-queue', label: 'Queue', type: 'cross-section', crossSection: true },
+            { from: 'add-to-queue', to: 'get-from-queue', label: 'Queue', type: 'cross-section', crossSection: true },
+
+            // Additional error paths to dead letter
+            { from: 'cache-message', to: 'dead-letter', label: 'Failed', type: 'error-flow', curve: true },
+            { from: 'consume-kafka', to: 'dead-letter', label: 'Decode Error', type: 'error-flow', curve: true }
+        ];
+
+        // Create flowchart
+        function createFlowchart() {
+            const flowchart = document.getElementById('flowchart');
+
+            // Create sections
+            const sections = [
+                { class: 'section-divider', style: 'left: 120px; top: 20px; width: 440px; height: 760px;', label: 'Kafka Consumer Process' },
+                { class: 'section-divider', style: 'left: 580px; top: 20px; width: 770px; height: 1200px;', label: 'Queue Consumer Process' },
+                { class: 'section-divider', style: 'left: 1371px; top: 20px; width: 440px; height: 760px;', label: 'Cache Consumer Process' },
+                { class: 'section-divider', style: 'left: 580px; top: 800px; width: 770px; height: 700px;', label: 'Lock Management' },
+                { class: 'error-region', style: 'left: 740px; top: 920px; width: 500px; height: 300px;', label: 'Error Flow Region' }
+            ];
+
+            sections.forEach(section => {
+                const div = document.createElement('div');
+                div.className = section.class;
+                div.setAttribute('style', section.style);
+                const label = document.createElement('div');
+                label.className = 'section-label';
+                if (section.class === 'error-region') {
+                    label.style.color = '#ff6b6b';
+                }
+                label.textContent = section.label;
+                div.appendChild(label);
+                flowchart.appendChild(div);
+            });
+
+            // Create nodes
+            nodes.forEach(node => {
+                const nodeEl = document.createElement('div');
+                nodeEl.className = `node ${node.type}`;
+                nodeEl.id = node.id;
+                nodeEl.style.left = `${node.x}px`;
+                nodeEl.style.top = `${node.y}px`;
+                nodeEl.innerHTML = node.text.replace(/\n/g, '<br>');
+                nodeEl.dataset.tooltip = node.tooltip;
+
+                nodeEl.addEventListener('mouseenter', showTooltip);
+                nodeEl.addEventListener('mouseleave', hideTooltip);
+
+                flowchart.appendChild(nodeEl);
+            });
+
+            // Create SVG for arrows
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.style.position = 'absolute';
+            svg.style.width = '100%';
+            svg.style.height = '100%';
+            svg.style.left = '0';
+            svg.style.top = '0';
+            svg.style.pointerEvents = 'none';
+            flowchart.appendChild(svg);
+
+            // Create arrows
+            connections.forEach((conn, index) => {
+                const fromNode = document.getElementById(conn.from);
+                const toNode = document.getElementById(conn.to);
+
+                if (fromNode && toNode) {
+                    const fromRect = fromNode.getBoundingClientRect();
+                    const toRect = toNode.getBoundingClientRect();
+                    const containerRect = flowchart.getBoundingClientRect();
+
+                    const fromX = fromRect.left + fromRect.width / 2 - containerRect.left;
+                    const fromY = fromRect.top + fromRect.height / 2 - containerRect.top;
+                    const toX = toRect.left + toRect.width / 2 - containerRect.left;
+                    const toY = toRect.top + toRect.height / 2 - containerRect.top;
+
+                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    path.classList.add('arrow-path');
+                    path.classList.add(conn.type || 'normal');
+                    path.id = `arrow-${index}`;
+
+                    let d;
+                    if (conn.curve || conn.type === 'loop-flow') {
+                        // Calculate control points for curves
+                        let controlOffsetX = 100;
+                        let controlOffsetY = 0;
+
+                        // Specific adjustments based on connection
+                        if (conn.from === conn.to) {
+                            controlOffsetX = conn.from.includes('cache') ? 200 : -200;
+                            controlOffsetY = -30;
+                        } else if (conn.from === 'check-kafka-lock' && conn.to === 'check-queue') {
+                            controlOffsetX = 200;
+                            controlOffsetY = -100;
+                        } else if (conn.from === 'send-to-queue' && conn.to === 'check-queue') {
+                            controlOffsetX = -280;
+                            controlOffsetY = 120;
+                        } else if (conn.from === 'max-retries' && conn.to === 'check-server') {
+                            controlOffsetX = -220;
+                            controlOffsetY = -120;
+                        } else if (conn.from === 'clear-locks' && conn.to === 'get-from-queue') {
+                            controlOffsetX = -300;
+                            controlOffsetY = 200;
+                        } else if (conn.from === 'cache-message' && conn.to === 'get-from-queue') {
+                            controlOffsetX = -150;
+                            controlOffsetY = -100;
+                        } else if (conn.from === 'cache-empty' && conn.to === 'check-cache-queue') {
+                            controlOffsetX = -150;
+                            controlOffsetY = 50;
+                        } else if (conn.from === 'add-to-queue' && conn.to === 'get-from-cache') {
+                            controlOffsetX = 150;
+                            controlOffsetY = 50;
+                        } else if (conn.from === 'cache-message' && conn.to === 'dead-letter') {
+                            controlOffsetX = -200;
+                            controlOffsetY = 50;
+                        } else if (conn.from === 'consume-kafka' && conn.to === 'dead-letter') {
+                            controlOffsetX = 400;
+                            controlOffsetY = 300;
+                        } else if (conn.crossSection) {
+                            controlOffsetX = 400;
+                        }
+
+                        const controlX = (fromX + toX) / 2 + controlOffsetX;
+                        const controlY = (fromY + toY) / 2 + controlOffsetY;
+                        d = `M ${fromX} ${fromY} Q ${controlX} ${controlY} ${toX} ${toY}`;
+                    } else {
+                        d = `M ${fromX} ${fromY} L ${toX} ${toY}`;
+                    }
+
+                    path.setAttribute('d', d);
+                    svg.appendChild(path);
+
+                    // Add label if exists
+                    if (conn.label) {
+                        const label = document.createElement('div');
+                        label.className = 'arrow-label';
+                        if (conn.isDecision) {
+                            label.className += ' decision-label';
+                        }
+                        label.textContent = conn.label;
+
+                        // Calculate label position
+                        let labelX = (fromX + toX) / 2;
+                        let labelY = (fromY + toY) / 2;
+
+                        // Position adjustments
+                        if (conn.isDecision) {
+                            labelY -= 20;
+                        } else {
+                            // Specific label offsets
+                            if (conn.label === 'Loop' || conn.label === 'Next') {
+                                labelY += 20;
+                            }
+                            if (conn.label === 'Queue') {
+                                labelX += 100;
+                            }
+                        }
+
+                        label.style.left = `${labelX - 25}px`;
+                        label.style.top = `${labelY - 8}px`;
+                        flowchart.appendChild(label);
+                    }
+
+                    // Add instrumentation badges
+                    if (conn.instrumentation) {
+                        const badge = document.createElement('div');
+                        badge.className = 'instrumentation-badge';
+                        badge.textContent = conn.instrumentation;
+                        
+                        const badgeX = (fromX + toX) / 2;
+                        const badgeY = (fromY + toY) / 2;
+                        
+                        badge.style.left = `${badgeX - 30}px`;
+                        badge.style.top = `${badgeY + 10}px`;
+                        flowchart.appendChild(badge);
+                    }
+                }
+            });
+        }
+
+        function showTooltip(e) {
+            const tooltip = document.getElementById('tooltip');
+            const text = e.target.dataset.tooltip;
+            if (text) {
+                tooltip.textContent = text;
+                tooltip.style.left = e.pageX + 10 + 'px';
+                tooltip.style.top = e.pageY + 10 + 'px';
+                tooltip.style.opacity = '1';
+            }
+        }
+
+        function hideTooltip() {
+            const tooltip = document.getElementById('tooltip');
+            tooltip.style.opacity = '0';
+        }
+
+        function animateFlow(nodeSequence, arrowIndices) {
+            resetAnimation();
+
+            let index = 0;
+            const interval = setInterval(() => {
+                if (index < nodeSequence.length) {
+                    const node = document.getElementById(nodeSequence[index]);
+                    if (node) {
+                        node.style.transform = 'scale(1.1)';
+                        node.style.boxShadow = '0 0 30px rgba(0, 255, 255, 0.8)';
+                    }
+
+                    if (index < arrowIndices.length) {
+                        const arrow = document.getElementById(`arrow-${arrowIndices[index]}`);
+                        if (arrow) {
+                            arrow.classList.add('active');
+                        }
+                    }
+
+                    index++;
+                } else {
+                    clearInterval(interval);
+                }
+            }, 500);
+        }
+
+        function simulateNormalFlow() {
+            const nodeSequence = [
+                'kafka-start', 'check-queue', 'check-kafka-lock', 'consume-kafka',
+                'send-to-queue', 'queue-start', 'get-from-queue', 'validate-message',
+                'check-server', 'process-message', 'send-grpc', 'grpc-success', 
+                'clear-locks', 'kafka-lock-state', 'data-api-lock-state'
+            ];
+            const arrowIndices = [0, 1, 3, 5, 6, 7, 8, 9, 11, 13, 14, 15, 18, 33, 34];
+            animateFlow(nodeSequence, arrowIndices);
+        }
+
+        function simulateErrorFlow() {
+            const nodeSequence = [
+                'queue-start', 'get-from-queue', 'validate-message', 'check-server', 
+                'server-retry', 'set-kafka-lock', 'kafka-lock-state', 'max-retries', 
+                'set-all-locks', 'kafka-lock-state', 'data-api-lock-state', 'cache-message',
+                'dead-letter'
+            ];
+            const arrowIndices = [7, 8, 9, 12, 19, 20, 31, 21, 23, 32, 33, 24, 40];
+            animateFlow(nodeSequence, arrowIndices);
+
+            // Make locks pulse
+            setTimeout(() => {
+                document.getElementById('kafka-lock-state').classList.add('lock-active');
+                document.getElementById('data-api-lock-state').classList.add('lock-active');
+            }, 4000);
+        }
+
+        function simulateRecoveryFlow() {
+            const nodeSequence = [
+                'cache-start', 'check-cache-queue', 'get-from-cache', 'cache-empty',
+                'add-to-queue', 'data-api-lock-state', 'queue-start', 'get-from-queue', 
+                'validate-message', 'check-server', 'process-message', 'send-grpc', 
+                'grpc-success', 'clear-locks', 'kafka-lock-state', 'data-api-lock-state'
+            ];
+            const arrowIndices = [26, 27, 29, 30, 35, 38, 7, 8, 9, 11, 13, 14, 15, 18, 33, 34];
+            animateFlow(nodeSequence, arrowIndices);
+
+            // Clear lock states at the end
+            setTimeout(() => {
+                document.getElementById('kafka-lock-state').classList.remove('lock-active');
+                document.getElementById('data-api-lock-state').classList.remove('lock-active');
+            }, 8000);
+        }
+
+        function resetAnimation() {
+            // Reset all nodes
+            document.querySelectorAll('.node').forEach(node => {
+                node.style.transform = 'scale(1)';
+                node.style.boxShadow = '';
+                node.classList.remove('lock-active');
+            });
+
+            // Reset all arrows
+            document.querySelectorAll('.arrow-path').forEach(arrow => {
+                arrow.classList.remove('active');
+            });
+        }
+
+        // Initialize flowchart
+        createFlowchart();
+    </script>
+</body>
+</html>
